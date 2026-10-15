@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bug Spotter: find, fix and prove</title>
+<style>
+:root{--bg:#f1f6f5;--card:#fff;--line:#d3e3df;--text:#12312c;--mute:#587670;--teal:#0f9d8a;--red:#d6334a;--green:#12a672;--amber:#e08a00;--soft:#e6f3f0;--code:#0e2724;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0c1917;--card:#132623;--line:#24433e;--text:#e3f4f0;--mute:#8fb5ad;--soft:#183530;--teal:#2dd4bf;--red:#ff6b7f;--green:#3ddc97;--amber:#f5b73b}}
+:root[data-theme="dark"]{--bg:#0c1917;--card:#132623;--line:#24433e;--text:#e3f4f0;--mute:#8fb5ad;--soft:#183530;--teal:#2dd4bf;--red:#ff6b7f;--green:#3ddc97;--amber:#f5b73b}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1100px;margin:auto;padding:18px 16px 36px}
+h1{font-size:clamp(24px,4vw,34px);margin:0}h1 small{font-size:14px;color:var(--teal);font-weight:700;margin-left:8px}
+.sub{color:var(--mute);margin:2px 0 12px}
+.cap{font-size:16px;font-weight:700;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--teal);border-radius:10px;padding:10px 14px;margin:10px 0 14px}
+button,select{font:inherit;font-weight:700;border-radius:10px;padding:9px 16px;cursor:pointer}
+button{border:0;background:var(--teal);color:#032a25}button:disabled{opacity:.5;cursor:wait}button.alt,select{background:var(--card);color:var(--text);border:1px solid var(--line)}
+:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;min-width:0;margin-bottom:14px}.card h3{margin:0 0 8px;font-size:15px}
+textarea{width:100%;min-height:190px;resize:vertical;background:var(--code);color:#e3f4f0;border:0;border-radius:10px;padding:10px 12px;font:600 13px/1.6 Consolas,Menlo,monospace}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}.row .sp{flex:1}
+.pill{padding:2px 10px;border-radius:99px;background:var(--soft);color:var(--mute);font-weight:700;font-size:12px}
+.steps{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}@media(max-width:760px){.steps{grid-template-columns:1fr}}
+.st{border:2px solid var(--line);border-radius:12px;padding:8px 10px;color:var(--mute);font-size:12px}.st b{display:block;font-size:14px}
+.st.on{border-color:var(--amber);color:var(--text);background:var(--soft)}.st.done{border-color:var(--teal);color:var(--text)}
+.log{margin-top:10px;font:600 13px/1.6 Consolas,Menlo,monospace;max-height:260px;overflow:auto}.log div{padding:1px 0}.log .bad{color:var(--red)}.log .good{color:var(--green)}.log .mute{color:var(--mute)}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}th{color:var(--mute);font-size:12px}
+.sum{font-size:17px;font-weight:800;margin:0 0 8px}.sum.ok{color:var(--green)}.sum.warn{color:var(--amber)}
+.diff{background:var(--code);border-radius:10px;padding:8px 0;overflow-x:auto;font:600 12px/1.6 Consolas,Menlo,monospace}.diff div{white-space:pre;padding:0 10px;color:#8fb5ad}.diff .m{color:#ff9aa8;background:#3a1620}.diff .p{color:#7ff0b8;background:#103326}
+.cov{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}.col{border:1px solid var(--line);border-radius:12px;padding:8px 10px}.col h4{margin:0 0 4px;font-size:14px}.col p{margin:0;font-size:13px;color:var(--mute)}
+</style></head><body><div class="wrap">
+<h1>Bug Spotter<small>Baseline · Locate · Patch · Prove · Report</small></h1>
+<p class="sub">Looks for 4 bug types only: SQL injection, XSS, command injection and hardcoded secrets. It keeps looping until none are left. All samples are made up and every key is fake.</p>
+<div class="cap" id="cap" aria-live="polite"></div>
+<div class="card"><h3>📄 Your code</h3>
+<textarea id="src" spellcheck="false" aria-label="Code to fix" placeholder="Paste Python, Java or C code here..."></textarea>
+<div class="row"><button id="go">▶ Run fixer</button>
+<select id="lang" aria-label="Language"><option value="auto">Auto-detect language</option><option value="py">Python</option><option value="java">Java</option><option value="c">C</option></select>
+<button class="alt" id="up">📁 Upload file</button><input type="file" id="file" accept=".py,.java,.c,.h,.txt" hidden>
+<span class="sp"></span><button class="alt" data-s="py">Sample: Python</button><button class="alt" data-s="java">Sample: Java</button><button class="alt" data-s="c">Sample: C</button></div></div>
+<div class="card" id="pc" hidden><h3>🔁 Fix loop <span class="pill" id="rd"></span></h3><div class="steps" id="steps"></div><div class="log" id="log"></div></div>
+<div class="card" id="rp" hidden></div>
+<div class="card"><h3>🗺️ What it handles</h3><div class="cov" id="cov"></div></div>
+</div>
+<script id="eng">
+const LN={py:"🐍 Python",java:"☕ Java",c:"⚙️ C"};
+const SIG={py:[[/^\s*def \w+\(.*\)\s*(->.*)?:/m,3],[/^\s*(import \w+|from \w+ import)/m,2],[/\bself\b/,1],[/^\s*(elif|except)\b/m,2],[/\bprint\(/,1],[/\b(None|True|False)\b/,1]],
+java:[[/\bpublic\s+(static\s+)?(class|void|interface)/,3],[/System\.out\.print/,3],[/^\s*import\s+java/m,3],[/\b(String|int|boolean)\s+\w+\s*=.*;/,1],[/\bnew\s+[A-Z]\w*\(/,1],[/\b(throws|extends|implements)\b/,2],[/HttpServlet|getParameter/,2]],
+c:[[/#include\s*[<"]/,4],[/\bint\s+main\s*\(/,3],[/\b(printf|malloc|free|sizeof)\s*\(/,2],[/\bchar\s*\*/,2],[/->/,1],[/\b(unsigned|size_t|struct)\b/,1]]};
+function pickLang(code){const s={};let t=0;for(const k in SIG){s[k]=SIG[k].reduce((a,[re,w])=>a+(re.test(code)?w:0),0);t+=s[k]}return{s,t,lang:t?Object.keys(s).sort((a,b)=>s[b]-s[a])[0]:null}}
+const SEC=/(\b\w*(?:password|passwd|secret|api_?key|token)\w*)\s*(\[\])?\s*=\s*(["'])[^"']{4,}\3/i;
+const RULES=[
+{id:'sqli',n:'SQL injection',cwe:'CWE-89',sev:'High',fix:'Use placeholders / PreparedStatement',re:{py:/execute(many)?\s*\(\s*(f["']|["'][^"']*["']\s*[%+]|.*\.format\()/,java:/"\s*(SELECT|INSERT|UPDATE|DELETE)\b[^"]*"\s*\+|execute(Query|Update)?\([^)]*\+/i}},
+{id:'xss',n:'XSS',cwe:'CWE-79',sev:'Medium',fix:'Escape output before it reaches the page',ok:/Encode\.forHtml|html\.escape/,re:{py:/render_template_string\([^)]*(\+|%|\.format\(|\bf["'])|\bmark_safe\(|\bMarkup\(|\|\s*safe\b/,java:/getWriter\(\)\.(print|println|write)\([^)]*(getParameter|\+)|innerHTML/}},
+{id:'cmd',n:'Command injection',cwe:'CWE-78',sev:'High',fix:'Run a fixed program with an argument list, no shell',ok:/exec\(\s*new String\s*\[/,re:{py:/\bos\.(system|popen)\(|subprocess\.\w+\(.*shell\s*=\s*True/,java:/Runtime\.getRuntime\(\)\.exec\([^)]*(\+|getParameter)|new ProcessBuilder\([^)]*\+/,c:/\b(system|popen)\s*\(\s*[^")\s]/}},
+{id:'secret',n:'Hardcoded secret',cwe:'CWE-798',sev:'High',fix:'Read it from the environment and rotate the old key',re:{all:SEC}}];
+const isCm=(t,l)=>{t=t.trim();return l==='py'?t.startsWith('#'):/^(\/\/|\/\*|\*)/.test(t)};
+function findAll(code,lang){const F=[];code.split('\n').forEach((t,i)=>{if(isCm(t,lang))return;RULES.forEach(r=>{const re=r.re[lang]||r.re.all;if(re&&re.test(t)&&!(r.ok&&r.ok.test(t)))F.push({r,i,line:t})})});return F}
+function topSplit(s,sep){const o=[];let d=0,q=null,b='';for(let i=0;i<s.length;i++){const c=s[i];if(q){b+=c;if(c==='\\')b+=s[++i]||'';else if(c===q)q=null;continue}
+if(c==='"'||c==="'"){q=c;b+=c;continue}if('([{'.includes(c))d++;if(')]}'.includes(c))d--;if(d===0&&c===sep){o.push(b);b='';continue}b+=c}o.push(b);return o}
+function call(line,re){const m=re.exec(line);if(!m)return null;const s=m.index+m[0].length;let d=1,q=null,i=s;
+for(;i<line.length;i++){const c=line[i];if(q){if(c==='\\')i++;else if(c===q)q=null;continue}if(c==='"'||c==="'")q=c;else if(c==='(')d++;else if(c===')'&&--d===0)break}
+return d?null:{m,pre:line.slice(0,s),arg:line.slice(s,i),post:line.slice(i)}}
+function parts(expr,lang){const out=[];for(const t of topSplit(expr,'+')){const m=/^\s*([fF]?)(["'])((?:\\.|(?!\2).)*)\2\s*$/.exec(t);
+if(!m){out.push({e:t.trim()});continue}
+if(m[1]&&lang==='py'){const r=/\{([^{}]+)\}/g,b=m[3];let last=0,x;while((x=r.exec(b))){if(x.index>last)out.push({l:b.slice(last,x.index)});out.push({e:x[1].trim()});last=r.lastIndex}if(last<b.length)out.push({l:b.slice(last)})}
+else out.push({l:m[3]})}return out.length?out:null}
+const qt=s=>'"'+s.replace(/(?<!\\)"/g,'\\"')+'"';
+const rebuild=(ps,fn)=>ps.map(p=>p.e!==undefined?fn(p.e):qt(p.l)).join(' + ');
+function ph(ps,H){let q='',P=[],st=false;ps.forEach(p=>{if(p.e===undefined){let t=p.l;if(st&&t[0]==="'")t=t.slice(1);st=false;q+=t}else{if(q.endsWith("'"))q=q.slice(0,-1);q+=H;P.push(p.e);st=true}});return[q,P]}
+function toArgs(ps){const a=[];let cur=[];const fl=()=>{if(cur.length)a.push(cur.join(' + '));cur=[]};
+ps.forEach(p=>{if(p.e!==undefined){cur.push(p.e);return}p.l.split(/(\s+)/).forEach(x=>{if(!x)return;if(/^\s+$/.test(x))fl();else cur.push(qt(x))})});fl();return a}
+const PATCH={
+sqli(line,lang,L,i,needs){
+ if(lang==='py'){const c=call(line,/\bexecute(?:many)?\(/);if(!c)return null;const top=topSplit(c.arg,',');if(top.length>1)return null;const f=top[0];let q,P,m;
+  if(m=/^\s*(["'])((?:\\.|(?!\1).)*)\1\s*%\s*(.+?)\s*$/.exec(f)){q=m[2].replace(/'?%s'?/g,'%s');P=/^\(.*\)$/.test(m[3])?topSplit(m[3].slice(1,-1),','):[m[3]]}
+  else if(m=/^\s*(["'])((?:\\.|(?!\1).)*)\1\.format\((.*)\)\s*$/.exec(f)){q=m[2].replace(/'?\{\}'?/g,'%s');P=topSplit(m[3],',')}
+  else{const ps=parts(f,'py');if(!ps||!ps.some(p=>p.e!==undefined))return null;[q,P]=ph(ps,'%s')}
+  P=P.map(s=>s.trim()).filter(Boolean);if(!P.length)return null;
+  return[c.pre+qt(q)+', ('+P.join(', ')+(P.length===1?',':'')+')'+c.post]}
+ const c=call(line,/\b(\w+)\.(executeQuery|executeUpdate|execute)\(/);if(!c)return null;
+ const ps=parts(c.arg,'java');if(!ps||!ps.some(p=>p.e!==undefined))return null;const[q,P]=ph(ps,'?');
+ let con='conn';for(let k=i-1;k>=0;k--){const m=/(\w+)\.createStatement\(/.exec(L[k]);if(m){con=m[1];break}}
+ const ind=/^\s*/.exec(line)[0],n=(L.join('\n').match(/PreparedStatement\s+ps\d*/g)||[]).length,v='ps'+(n?n+1:'');needs.add('ps');
+ return[ind+'PreparedStatement '+v+' = '+con+'.prepareStatement('+qt(q)+');',...P.map((p,k)=>ind+v+'.setString('+(k+1)+', '+p+');'),line.slice(0,c.m.index)+v+'.'+c.m[2]+'()'+c.post.slice(1)]},
+xss(line,lang,L,i,needs){
+ if(lang==='py'){
+  if(/\|\s*safe\b/.test(line))return[line.replace(/\s*\|\s*safe\b/g,'')];
+  if(/\b(mark_safe|Markup)\(/.test(line)){needs.add('html');return[line.replace(/\b(mark_safe|Markup)\(/g,'html.escape(')]}
+  const c=call(line,/render_template_string\(/);if(!c)return null;const top=topSplit(c.arg,','),ps=parts(top[0],'py');if(!ps||!ps.some(p=>p.e!==undefined))return null;needs.add('html');
+  return[c.pre+[rebuild(ps,e=>'html.escape(str('+e+'))'),...top.slice(1)].join(',')+c.post]}
+ if(/innerHTML/.test(line))return[line.replace(/\.innerHTML\b/g,'.textContent')];
+ const c=call(line,/getWriter\(\)\.(?:print|println|write)\(/);if(!c)return null;const ps=parts(c.arg,'java');if(!ps||!ps.some(p=>p.e!==undefined))return null;
+ return[c.pre+rebuild(ps,e=>'org.owasp.encoder.Encode.forHtml('+e+')')+c.post]},
+cmd(line,lang,L,i,needs){
+ if(lang==='c'){const m=/^(\s*)system\s*\((.+)\)\s*;\s*$/.exec(line);if(!m)return null;['unistd','wait','types'].forEach(k=>needs.add(k));const I=m[1],x=m[2];
+  return[I+'{',I+'  pid_t pid = fork();',I+'  if (pid == 0) { execlp('+x+', '+x+', (char *)NULL); _exit(127); }',I+'  else if (pid > 0) { waitpid(pid, NULL, 0); }',I+'}']}
+ if(lang==='java'){let c=call(line,/Runtime\.getRuntime\(\)\.exec\(/),pb=false;if(!c){c=call(line,/new ProcessBuilder\(/);pb=true}if(!c)return null;
+  const ps=parts(c.arg,'java');if(!ps)return null;const a=toArgs(ps);return[c.pre+(pb?a.join(', '):'new String[]{'+a.join(', ')+'}')+c.post]}
+ const c=call(line,/\b(?:os\.(?:system|popen)|subprocess\.\w+)\(/);if(!c)return null;needs.add('subprocess');
+ const top=topSplit(c.arg,','),ps=parts(top[0],'py');if(!ps)return null;
+ const rest=top.slice(1).map(s=>s.trim()).filter(a=>!/^shell\s*=\s*True$/.test(a)),pop=/os\.popen/.test(c.m[0]),sys=/os\.system/.test(c.m[0]);
+ const nm=pop||sys?'subprocess.run(':c.m[0],ex=pop?['capture_output=True','text=True']:sys?['check=True']:rest;
+ return[line.slice(0,c.m.index)+nm+'['+toArgs(ps).join(', ')+']'+(ex.length?', '+ex.join(', '):'')+')'+(pop?'.stdout':'')+c.post.slice(1).replace(/^\.read\(\)/,'')]},
+secret(line,lang,L,i,needs){const m=SEC.exec(line);if(!m)return null;const name=m[1],env=name.replace(/([a-z])([A-Z])/g,'$1_$2').toUpperCase();
+ const rep=lang==='py'?name+' = os.environ["'+env+'"]':lang==='java'?name+' = System.getenv("'+env+'")':(m[2]?'*':'')+name+' = getenv("'+env+'")';
+ if(lang==='py')needs.add('os');if(lang==='c'){needs.add('stdlib');if(!/^\s/.test(line))return['#define '+name+' getenv("'+env+'")']}
+ return[line.slice(0,m.index)+rep+line.slice(m.index+m[0].length)]}};
+const HDR={py:{os:'import os',subprocess:'import subprocess',html:'import html'},java:{ps:'import java.sql.PreparedStatement;'},c:{unistd:'#include <unistd.h>',wait:'#include <sys/wait.h>',types:'#include <sys/types.h>',stdlib:'#include <stdlib.h>'}};
+function ensure(L,lang,needs){[...needs].forEach(k=>{const h=HDR[lang][k],re=lang==='py'?new RegExp('^\\s*(import\\s+(.*,\\s*)?'+k+'\\b|from\\s+'+k+'\\b)'):null;
+ if(L.some(t=>lang==='py'?re.test(t):lang==='java'?/java\.sql\.(PreparedStatement|\*)/.test(t):t.trim()===h))return;
+ let at=0;L.forEach((t,j)=>{if(/^\s*(#include|import|from|package)\b/.test(t))at=j+1});L.splice(at,0,h)})}
+function diffLines(a,b){const n=a.length,m=b.length,T=Array.from({length:n+1},()=>new Int32Array(m+1));
+ for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)T[i][j]=a[i]===b[j]?T[i+1][j+1]+1:Math.max(T[i+1][j],T[i][j+1]);
+ const o=[];let i=0,j=0;while(i<n&&j<m){if(a[i]===b[j]){o.push({t:'=',s:a[i]});i++;j++}else if(T[i+1][j]>=T[i][j+1])o.push({t:'-',s:a[i++]});else o.push({t:'+',s:b[j++]})}
+ while(i<n)o.push({t:'-',s:a[i++]});while(j<m)o.push({t:'+',s:b[j++]});return o}
+const net=c=>{const s=c.replace(/"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'/g,'');return['()','[]','{}'].map(p=>s.split(p[0]).length-s.split(p[1]).length).join(',')};
+function sanity(before,after,lang,F0){const flagged=new Set(F0.map(f=>f.line)),d=diffLines(before.split('\n'),after.split('\n'));
+ return[{n:'Brackets balanced like the original',ok:net(after)===net(before)},{n:'Only flagged lines were changed',ok:d.filter(x=>x.t==='-').every(x=>flagged.has(x.s))},{n:'Language still detected',ok:pickLang(after).lang===lang}]}
+function pipeline(code,lang){const F0=findAll(code,lang),t0=sanity(code,code,lang,F0);let L=code.split('\n');const rounds=[];
+ for(let n=1;n<=10;n++){const F=findAll(L.join('\n'),lang);if(!F.length)break;const needs=new Set(),seen=new Set(),manual=[];let fixed=0;
+  F.sort((a,b)=>b.i-a.i).forEach(f=>{if(seen.has(f.i))return;seen.add(f.i);const nl=PATCH[f.r.id](L[f.i],lang,L,f.i,needs);
+   if(nl&&!(nl.length===1&&nl[0]===L[f.i])){L.splice(f.i,1,...nl);fixed++}else manual.push(f)});
+  ensure(L,lang,needs);rounds.push({n,found:F.slice().sort((a,b)=>a.i-b.i),fixed,manual,left:findAll(L.join('\n'),lang).length});if(!fixed)break}
+ const out=L.join('\n');return{lang,F0,t0,rounds,out,F1:findAll(out,lang),t1:sanity(code,out,lang,F0),diff:diffLines(code.split('\n'),L)}}
+const SAMPLES={py:`import os
+API_KEY = "sk_live_DEMO_51Hx9"
+def get_doc(request):
+    doc_id = request.args["id"]
+    cur.execute("SELECT * FROM docs WHERE id=" + doc_id)
+    os.system("convert " + request.args["f"])
+    return render_template_string("<h1>Hello " + request.args["name"] + "</h1>")`,
+java:`public class Doc extends HttpServlet {
+  String password = "admin123";
+  void doGet(HttpServletRequest req, HttpServletResponse res) throws Exception {
+    String id = req.getParameter("id");
+    Statement st = con.createStatement();
+    ResultSet rs = st.executeQuery("SELECT * FROM docs WHERE id=" + id);
+    Runtime.getRuntime().exec("ping " + req.getParameter("host"));
+    res.getWriter().println("Hello " + req.getParameter("name"));
+  }
+}`,
+c:`#include <stdio.h>
+#include <string.h>
+char *password = "admin123";
+int main(int argc, char **argv) {
+  printf("Running %s\\n", argv[1]);
+  system(argv[2]);
+  return 0;
+}`};
+</script>
+<script>
+if(typeof document!=='undefined'){
+const $=s=>document.querySelector(s),esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),sleep=ms=>new Promise(r=>setTimeout(r,ms)),cap=t=>$('#cap').textContent=t;
+const STEPS=[['BASELINE','Run existing tests, record results'],['LOCATE','Find the bug'],['PATCH','Minimal root-cause fix'],['PROVE','Tests still pass + exploit test flips'],['REPORT','Patch + evidence']];
+const mark=i=>$('#steps').innerHTML=STEPS.map((s,k)=>`<div class="st ${k<i?'done':k===i?'on':''}"><b>${k+1}. ${s[0]}</b>${s[1]}</div>`).join('');
+const log=(t,c='')=>{const d=document.createElement('div');d.className=c;d.textContent=t;$('#log').appendChild(d);$('#log').scrollTop=1e9};
+const by=(F,r)=>F.filter(f=>f.r===r).length,brief=F=>F.map(f=>`${f.r.n} (line ${f.i+1})`).join(', ');
+let busy=false,fixedCode='';
+function coverage(){const has={sqli:['py','java'],xss:['py','java'],cmd:['py','java','c'],secret:['py','java','c']};
+ $('#cov').innerHTML=RULES.map(r=>`<div class="col"><h4>${r.n} <span class="pill">${r.cwe}</span></h4><p>${['py','java','c'].map(l=>(has[r.id].includes(l)?'✅ ':'— ')+LN[l].split(' ')[1]).join(' · ')}</p></div>`).join('')}
+function report(R){const ok=!R.F1.length,nb=R.F0.length;
+ const ty=RULES.map(r=>{const b=by(R.F0,r),a=by(R.F1,r);return`<tr><td>${r.n} <span class="pill">${r.cwe}</span></td><td>${b}</td><td>${a}</td><td>${!b?'—':a?'❌ still vulnerable':'✅ FAIL → PASS'}</td></tr>`}).join('');
+ const tr=R.t1.map((t,k)=>`<tr><td>${t.n}</td><td>${R.t0[k].ok?'✅':'❌'}</td><td>${t.ok?'✅ pass':'❌ fail'}</td></tr>`).join('');
+ const man=R.F1.map(f=>`<li>Line ${f.i+1}, ${f.r.n}: <code>${esc(f.line.trim())}</code>. ${f.r.fix}.</li>`).join('');
+ $('#rp').hidden=false;$('#rp').innerHTML=`<h3>📋 Report: patch + evidence</h3><p class="sum ${ok?'ok':'warn'}">${nb?(ok?`✅ All ${nb} bug${nb>1?'s':''} fixed in ${R.rounds.length} round${R.rounds.length>1?'s':''}`:`⚠️ ${nb-R.F1.length} of ${nb} fixed. ${R.F1.length} need a manual fix`):'✅ No SQL injection, XSS, command injection or hardcoded secret found'}</p>
+ ${man?`<ul>${man}</ul>`:''}<table><tr><th>Bug type</th><th>Before</th><th>After</th><th>Exploit test</th></tr>${ty}</table>
+ <table style="margin-top:10px"><tr><th>Existing checks</th><th>Baseline</th><th>After patch</th></tr>${tr}</table>
+ <h3 style="margin-top:12px">Patch (diff)</h3><div class="diff">${R.diff.map(d=>`<div class="${d.t==='-'?'m':d.t==='+'?'p':''}">${d.t==='='?'  ':d.t+' '}${esc(d.s)}</div>`).join('')}</div>
+ <h3 style="margin-top:12px">Fixed code</h3><textarea id="fx" readonly aria-label="Fixed code">${esc(R.out)}</textarea>
+ <div class="row"><button id="cp">📋 Copy fixed code</button><button class="alt" id="dl">⬇ Download</button></div>
+ <p class="sub">Exploit tests and checks here are pattern-based, not your project's real test suite. Run your own tests before you merge.</p>`;
+ fixedCode=R.out;$('#cp').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(fixedCode);cap('Fixed code copied.')};
+ $('#dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([fixedCode],{type:'text/plain'}));a.download='fixed.'+R.lang;a.click()}}
+async function run(){if(busy)return;const code=$('#src').value;if(!code.trim()){cap('Paste some code first, or press a sample button.');return}
+ let lang=$('#lang').value;if(lang==='auto')lang=pickLang(code).lang;if(!lang){cap('I could not tell the language. Pick one in the menu and run again.');return}
+ busy=true;$('#go').disabled=true;$('#pc').hidden=false;$('#rp').hidden=true;$('#log').innerHTML='';$('#rd').textContent='';
+ const R=pipeline(code,lang);cap(`Language: ${LN[lang].split(' ')[1]}. Running the fix loop...`);
+ mark(0);log('BASELINE: '+R.t0.map(t=>(t.ok?'✓ ':'✗ ')+t.n).join(' | '));log(`BASELINE: recorded ${R.F0.length} bug${R.F0.length===1?'':'s'}${R.F0.length?': '+brief(R.F0):''}`,R.F0.length?'bad':'good');await sleep(600);
+ for(const rd of R.rounds){$('#rd').textContent='Round '+rd.n;mark(1);log(`R${rd.n} LOCATE: ${rd.found.length} found: ${brief(rd.found)}`,'bad');await sleep(550);
+  mark(2);log(`R${rd.n} PATCH: applied ${rd.fixed} minimal fix${rd.fixed===1?'':'es'}`+(rd.manual.length?`, ${rd.manual.length} could not be patched automatically`:''));await sleep(550);
+  mark(3);log(`R${rd.n} PROVE: re-scan shows ${rd.left} left`+(rd.left?'. Looping again...':'. All exploit checks flipped to pass.'),rd.left?'mute':'good');await sleep(550)}
+ mark(4);await sleep(300);mark(5);report(R);log(R.F1.length?`REPORT: stopped with ${R.F1.length} unresolved.`:'REPORT: done. Patch and evidence below.',R.F1.length?'bad':'good');
+ cap(R.F0.length?(R.F1.length?`Fixed ${R.F0.length-R.F1.length} of ${R.F0.length}. ${R.F1.length} need manual review.`:`All ${R.F0.length} bugs fixed in ${R.rounds.length} round${R.rounds.length>1?'s':''}.`):'No bugs of these 4 types found.');
+ busy=false;$('#go').disabled=false}
+$('#go').onclick=run;
+document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{$('#src').value=SAMPLES[b.dataset.s];$('#lang').value='auto';run()});
+$('#up').onclick=()=>$('#file').click();
+$('#file').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('#src').value=r.result;run()};r.readAsText(f)};
+coverage();cap('Press a sample button, or paste your code and press "Run fixer".')}
+</script></body></html>
