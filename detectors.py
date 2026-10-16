@@ -12,7 +12,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-SKIP_PARTS = {"tests", ".venv", "venv", "__pycache__", ".git", "node_modules", "site-packages"}
+SKIP_PARTS = {"tests", ".venv", "venv", "__pycache__", ".git", "node_modules", "site-packages",
+              ".pytest_cache", "_security", ".mypy_cache", ".tox", "dist", "build"}
 
 
 def _run(cmd, cwd, timeout=300):
@@ -68,7 +69,9 @@ def _first_sentence(text, limit=160):
 # ---- parsers (take the tool's JSON, return raw findings) -------------------
 
 def parse_semgrep(data):
-    out = []
+    out = []    
+    for e in data.get("errors", [])[:2]:
+        print("   [semgrep error]", str(e.get("message", ""))[:120], flush=True)
     for r in data.get("results", []):
         extra = r.get("extra", {})
         rule = r.get("check_id", "")
@@ -117,7 +120,7 @@ def run_semgrep(site):
     exe = shutil.which("semgrep")
     if not exe:
         return [], "skipped (semgrep not found)"
-    _, out, err = _run([exe, "--config", "p/python", "--config", "p/flask", "--config", "p/secrets",
+    _, out, err = _run([exe, "--config", "p/python", "--config", "p/flask", "--config", "p/secrets","--config", "p/javascript", "--config", "p/xss",
                         "--json", "--quiet", "--metrics=off", "."], site)
     data, problem = _json_or_error(out, err)
     if data is None:
@@ -151,6 +154,9 @@ def run_builtin(site):
     out = [{"type": f["type"], "file": _norm(f["file"]), "line": f["line"], "why": f["why"],
             "rule": "builtin", "tool": "builtin"} for f in scan_site(site)]
     return out, "ok"
+def run_web(site):
+    from webscan import scan_web
+    return scan_web(site), "ok"
 
 
 # ---- merge -----------------------------------------------------------------
@@ -174,7 +180,8 @@ def detect(site):
     """Returns (merged findings, {tool name: status})."""
     raw, status = [], {}
     for name, fn in (("semgrep", run_semgrep), ("bandit", run_bandit),
-                     ("detect-secrets", run_detect_secrets), ("builtin", run_builtin)):
+                     ("detect-secrets", run_detect_secrets), ("builtin", run_builtin),
+                     ("webscan", run_web)):
         found, state = fn(site)
         found = [f for f in found if not _skip(f["file"])]
         status[name] = f"{state}, {len(found)} finding(s)" if state == "ok" else state

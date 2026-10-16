@@ -1,9 +1,7 @@
 import os
-from fixloop import ask_json
+from fixloop import ask_json, MODEL, FALLBACKS
 
-print("provider:", os.environ.get("LLM_PROVIDER"))
-print("model:", os.environ.get("GROQ_MODEL"))
-print("key set:", bool(os.environ.get("GROQ_API_KEY")))
-
-out = ask_json('Reply with only this JSON: {"ok": true}')
-print("reply:", repr(out))
+print("gemini key set:", bool(os.environ.get("GEMINI_API_KEY")))
+print("model:", MODEL)
+print("fallbacks:", FALLBACKS)
+print(ask_json('Reply with only this JSON: {"ok": true}'))

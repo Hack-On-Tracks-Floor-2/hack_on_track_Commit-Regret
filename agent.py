@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 from fixloop import klass
 from review import review_site
+from detectors import detect
 
 from tools import prepare_repo, discover_sites, setup_env, run_tests
 from scanner import scan_site
@@ -29,24 +30,44 @@ def to_int(x):
         return 0
 
 
+def is_dup(a, b):
+    return (cls_of(a) == cls_of(b)
+            and Path(str(a.get("file", ""))).name == Path(str(b.get("file", ""))).name
+            and abs(to_int(a.get("line")) - to_int(b.get("line"))) <= 3)
+
+
 def get_findings(site):
-    scanned = [as_dict(f) for f in scan_site(site)]
+    # Step 1: candidates from the built-in scanner
+    candidates = [as_dict(f) for f in scan_site(site)]
+
+    # Step 2: candidates from Semgrep, Bandit, detect-secrets and webscan
     try:
-        kept, new, dropped = review_site(site, scanned)
+        tool_found, status = detect(site)
+        for tool, s in status.items():
+            print(f"   [detect:{tool}] {s}", flush=True)
     except Exception as e:
-        print(f"[agent] LLM review failed ({str(e)[:80]}); using scanner findings only", flush=True)
-        return scanned
+        print(f"[agent] detectors failed ({str(e)[:80]}); using scanner only", flush=True)
+        tool_found = []
+    for t in tool_found:
+        if t.get("type") == "OTHER":
+            continue
+        if not any(is_dup(c, t) for c in candidates):
+            candidates.append(t)
+
+    # Step 3: LLM triage (drops false positives, adds missed bugs)
+    try:
+        kept, new, dropped = review_site(site, candidates)
+    except Exception as e:
+        print(f"[agent] LLM review failed ({str(e)[:80]}); using tool findings only", flush=True)
+        return candidates
     for f, why in dropped:
         print(f"   (dropped false positive: {cls_of(f)} {f.get('file')}:{f.get('line')} - {why[:80]})")
     merged = list(kept)
     for n in new:
-        dup = any(cls_of(m) == cls_of(n)
-                  and Path(str(m.get("file", ""))).name == Path(str(n.get("file", ""))).name
-                  and abs(to_int(m.get("line")) - to_int(n.get("line"))) <= 3
-                  for m in merged)
-        if not dup:
+        if not any(is_dup(m, n) for m in merged):
             merged.append(n)
     return merged
+
 
 def sweep_old_temp():
     """Delete leftovers from earlier runs (venv_* and agent_* in the temp folder)."""
